@@ -344,6 +344,62 @@
     .week-panel { flex-direction: column; gap: 10px; text-align: center; }
     .grid-featured { grid-template-columns: 1fr; }
   }
+
+  /* ===== BOT Chain ecosystem footer (KPI 5) — cassette inlay card ===== */
+  .bc-foot { max-width: 760px; margin: 58px auto 44px; padding: 0 18px; }
+  .bc-cassette {
+    background: linear-gradient(180deg, var(--shell) 0%, var(--shell-2) 100%);
+    border: 2px solid var(--tape-black); border-radius: 8px;
+    box-shadow: 0 10px 26px var(--shadow), inset 0 1px 0 rgba(255,255,255,0.55);
+    overflow: hidden;
+  }
+  .bc-cassette .bc-strip {
+    background: var(--tape-black); color: var(--cream);
+    font-family: 'VT323', monospace; font-size: 15px; letter-spacing: 0.14em;
+    padding: 5px 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .bc-cassette .bc-strip span:last-child { color: var(--amber); }
+  .bc-cassette .bc-window {
+    display: flex; align-items: center; justify-content: center; gap: 20px;
+    padding: 26px 20px 20px;
+  }
+  .bc-cassette .bc-reel {
+    width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+    background: radial-gradient(circle, var(--shell) 0 16%, var(--tape) 17% 100%);
+    border: 2px solid var(--tape-black);
+    box-shadow: inset 0 0 0 5px rgba(0,0,0,0.12);
+    position: relative;
+  }
+  .bc-cassette .bc-reel::after {
+    content: ''; position: absolute; inset: 40%; border-radius: 50%;
+    background: var(--cream); border: 1px solid var(--tape-black);
+  }
+  @media (max-width: 560px) { .bc-cassette .bc-reel { display: none; } }
+  .bc-cassette .bc-plate { text-align: center; }
+  .bc-cassette .bc-logo { margin-bottom: 6px; }
+  .bc-cassette .bc-logo svg { width: 20px; height: 31px; display: block; margin: 0 auto; }
+  .bc-cassette .bc-word {
+    font-family: 'Permanent Marker', cursive; font-size: 26px; color: var(--tape-black);
+    line-height: 1.1; transform: rotate(-1.4deg);
+  }
+  .bc-cassette .bc-word em { font-style: normal; color: var(--amber-2); }
+  .bc-cassette .bc-sub {
+    font-family: 'VT323', monospace; font-size: 15px; color: var(--tape);
+    letter-spacing: 0.1em; margin-top: 3px;
+  }
+  .bc-cassette .bc-lines { padding: 0 22px 20px; }
+  .bc-cassette .bc-rule { height: 1px; background: repeating-linear-gradient(90deg, var(--tape) 0 6px, transparent 6px 11px); margin-bottom: 14px; }
+  .bc-cassette .bc-links { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .bc-cassette .bc-links a {
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+    color: var(--tape-black); text-decoration: none;
+    background: var(--cream); border: 1.5px solid var(--tape-black); border-radius: 4px;
+    padding: 7px 14px; box-shadow: 2px 2px 0 var(--tape-black);
+    transition: transform .12s, box-shadow .12s, background .15s;
+  }
+  .bc-cassette .bc-links a:hover {
+    background: var(--amber); transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--tape-black);
+  }
 </style>
 </head>
 <body>
@@ -396,7 +452,7 @@
     TrackJack
   </div>
   <div class="spacer"></div>
-  <div class="net-badge" id="netBadge">BOT TESTNET</div>
+  <div class="net-badge" id="netBadge">BOT MAINNET</div>
   <button class="btn btn-small" id="connectBtn">CONNECT</button>
 </header>
 
@@ -453,26 +509,32 @@
 
 <script>
   // ========= CONFIG =========
-  const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // <-- paste deployed address here
+  const CONTRACT_ADDRESS = "0xEb42A63d0D8C22e3d50014196367Ae201D804C3d"; // BOT Chain mainnet 677
 
   const CHAINS = {
     testnet: {
       chainIdHex: "0x3C8",
       chainIdDec: 968,
       name: "BOT Chain Testnet",
+      label: "BOT TESTNET",
       rpc: "https://rpc.bohr.life",
+      explorer: "https://scan.bohr.life",
       symbol: "BOT",
     },
-    // To use mainnet, swap `active` below to `mainnet`:
+    // Live on mainnet. Swap `active` back to `testnet` to run against 968.
     mainnet: {
       chainIdHex: "0x2A5",
       chainIdDec: 677,
-      name: "BOT Chain Mainnet",
+      // chainName as MetaMask should register it — matches every other BOT Chain frontend
+      name: "BOT Chain",
+      // separate display label, so the badge can say MAINNET without changing chainName
+      label: "BOT MAINNET",
       rpc: "https://rpc.botchain.ai",
+      explorer: "https://scan.botchain.ai",
       symbol: "BOT",
     },
   };
-  const active = CHAINS.testnet;
+  const active = CHAINS.mainnet;
 
   const ABI = [
     "function submitTrack(string title, string artist, string url) payable returns (uint256)",
@@ -543,6 +605,7 @@
                 chainId: active.chainIdHex,
                 chainName: active.name,
                 rpcUrls: [active.rpc],
+                blockExplorerUrls: [active.explorer],
                 nativeCurrency: { name: "BOT", symbol: active.symbol, decimals: 18 },
               }],
             });
@@ -803,7 +866,7 @@
 
   // ========= INIT =========
   (async function init() {
-    $("netBadge").textContent = active.name.toUpperCase();
+    $("netBadge").textContent = active.label;
     const rp = makeReadProvider();
     if (rp) {
       readContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, rp);
@@ -816,5 +879,35 @@
     }
   })();
 </script>
+
+<!-- ===== BOT Chain ecosystem footer (KPI 5) ===== -->
+<footer class="bc-foot">
+  <div class="bc-cassette">
+    <div class="bc-strip">
+      <span>MAINNET // CHAIN 677</span>
+    </div>
+    <div class="bc-window">
+      <div class="bc-reel" aria-hidden="true"></div>
+      <div class="bc-plate">
+        <div class="bc-logo" aria-hidden="true">
+          <svg viewBox="0 0 63.63 100" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#00A67E" d="M31.67 99.95 L0 82.48 L0.11 63.74 L47.01 90.60 L47.01 73.19 L15.98 55.32 L15.95 36.49 L46.92 53.57 L47.39 36.82 L15.96 17.81 L16.26 0 L63.06 27.02 L62.82 46.20 L47.86 54.67 L62.85 63.00 L63.62 81.42 Z"/>
+          </svg>
+        </div>
+        <div class="bc-word"><em>BOT</em> Chain</div>
+      </div>
+      <div class="bc-reel" aria-hidden="true"></div>
+    </div>
+    <div class="bc-lines">
+      <div class="bc-rule"></div>
+      <div class="bc-links">
+        <a href="https://botchain.ai" target="_blank" rel="noopener noreferrer">botchain.ai</a>
+        <a href="https://scan.botchain.ai" target="_blank" rel="noopener noreferrer">Explorer</a>
+        <a href="https://scan.botchain.ai/address/0xEb42A63d0D8C22e3d50014196367Ae201D804C3d" target="_blank" rel="noopener noreferrer">Contract</a>
+      </div>
+    </div>
+    <div class="bc-strip"><span>&copy; 2026 BOT CHAIN</span><span>SIDE A</span></div>
+  </div>
+</footer>
 </body>
 </html>
