@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TrackJack — Curate the tape. Weekly.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=VT323&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+<style>
+  :root {
+    --paper: #3d2814;
+    --paper-2: #2a1a0d;
+    --shell: #e8dcc4;
+    --shell-2: #d9c9a8;
+    --tape: #5b3a1c;
+    --tape-black: #1a1109;
+    --cream: #f4e9d5;
+    --amber: #f0b040;
+    --amber-2: #d9902a;
+    --red: #c94b3c;
+    --shadow: rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--cream);
+    background: var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 3px),
+      radial-gradient(1200px 800px at 50% -200px, rgba(240,176,64,0.08), transparent 60%);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Topbar */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+    border-bottom: 1px solid rgba(240,176,64,0.25);
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 4px 20px var(--shadow);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Permanent Marker', cursive;
+    font-size: 26px;
+    color: var(--cream);
+    letter-spacing: 1px;
+  }
+  .brand svg { width: 34px; height: 22px; }
+  .spacer { flex: 1; }
+  .net-badge {
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+    padding: 4px 10px;
+    background: var(--tape-black);
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    border-radius: 4px;
+  }
+  /* Boombox-style buttons */
+  .btn {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    border: none;
+    background: linear-gradient(180deg, var(--shell) 0%, var(--shell-2) 100%);
+    color: var(--tape-black);
+    padding: 10px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.5),
+      inset 0 -2px 0 rgba(0,0,0,0.2),
+      0 3px 0 rgba(0,0,0,0.35);
+    transition: transform 0.08s, box-shadow 0.15s;
+  }
+  .btn:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 0 rgba(0,0,0,0.2), 0 3px 12px var(--amber); }
+  .btn:active { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 0 rgba(0,0,0,0.2), 0 1px 0 rgba(0,0,0,0.35); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-rec {
+    background: linear-gradient(180deg, #e05a4a 0%, var(--red) 100%);
+    color: var(--cream);
+  }
+  .btn-rec::before {
+    content: '⏺'; margin-right: 6px; color: #fff;
+  }
+  .btn-play::before { content: '▶'; margin-right: 6px; }
+  .btn-small { padding: 6px 14px; font-size: 13px; }
+
+  /* Layout */
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+  .hero {
+    text-align: center;
+    padding: 30px 10px 20px;
+  }
+  .hero h1 {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 48px;
+    margin: 0;
+    color: var(--cream);
+    text-shadow: 3px 3px 0 var(--tape-black);
+  }
+  .hero p {
+    font-size: 16px;
+    color: rgba(244,233,213,0.75);
+    margin: 8px 0 0;
+  }
+
+  /* Week / countdown display */
+  .week-panel {
+    margin: 24px auto;
+    max-width: 640px;
+    background: var(--tape-black);
+    border: 2px solid var(--amber);
+    border-radius: 8px;
+    padding: 16px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: inset 0 0 30px rgba(240,176,64,0.15);
+  }
+  .week-label {
+    font-family: 'VT323', monospace;
+    font-size: 22px;
+    color: var(--amber);
+  }
+  .countdown {
+    font-family: 'VT323', monospace;
+    font-size: 34px;
+    color: var(--amber);
+    letter-spacing: 2px;
+    text-shadow: 0 0 12px rgba(240,176,64,0.6);
+  }
+
+  /* Submit form — cassette label being written on */
+  .submit-card {
+    background: var(--shell);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 24px auto;
+    max-width: 640px;
+    color: var(--tape-black);
+    box-shadow: 0 6px 24px var(--shadow);
+    position: relative;
+  }
+  .submit-card::before {
+    content: '';
+    position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+    border: 1px dashed rgba(0,0,0,0.2);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+  .submit-card h3 {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 22px;
+    margin: 0 0 14px;
+    color: var(--tape);
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    color: var(--tape);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .field input {
+    width: 100%;
+    font-family: 'Permanent Marker', cursive;
+    font-size: 18px;
+    padding: 8px 10px;
+    border: none;
+    border-bottom: 2px solid var(--tape);
+    background: transparent;
+    color: var(--tape-black);
+    outline: none;
+  }
+  .field input:focus { border-bottom-color: var(--red); }
+
+  /* Filter tabs */
+  .tabs {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin: 30px 0 16px;
+    justify-content: center;
+  }
+  .tab {
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    padding: 6px 14px;
+    background: var(--tape-black);
+    color: var(--cream);
+    border: 1px solid rgba(244,233,213,0.3);
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .tab.active {
+    background: var(--amber);
+    color: var(--tape-black);
+    border-color: var(--amber);
+  }
+
+  .section-title {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 26px;
+    margin: 24px 0 12px;
+    color: var(--cream);
+  }
+
+  /* Cassette card */
+  .cassette {
+    background: var(--shell);
+    border-radius: 10px;
+    padding: 14px 16px;
+    color: var(--tape-black);
+    margin-bottom: 14px;
+    box-shadow: 0 4px 14px var(--shadow), inset 0 -3px 0 rgba(0,0,0,0.12);
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cassette.featured {
+    background: linear-gradient(135deg, #f4e0b0 0%, var(--shell) 100%);
+    border: 2px solid var(--amber);
+  }
+  .position-badge {
+    position: absolute;
+    top: 8px; right: 10px;
+    font-family: 'Permanent Marker', cursive;
+    font-size: 22px;
+    color: var(--tape-black);
+    background: linear-gradient(135deg, #f4d67a, var(--amber));
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 2px solid #b7871a;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 2px 4px rgba(0,0,0,0.3);
+  }
+  .cassette-svg { width: 200px; height: 120px; display: block; }
+  .cassette-svg .reel { transform-origin: center; transform-box: fill-box; }
+  .cassette.featured .cassette-svg .reel,
+  .cassette:hover .cassette-svg .reel {
+    animation: spin 3s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .track-info { min-width: 0; }
+  .track-title {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 22px;
+    color: var(--tape-black);
+    line-height: 1.1;
+    word-wrap: break-word;
+  }
+  .track-artist {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 15px;
+    color: var(--tape);
+    margin-top: 2px;
+  }
+  .track-meta {
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    color: var(--tape);
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+  .track-url a {
+    color: var(--red);
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+  }
+  .vu {
+    display: flex; align-items: end; gap: 2px; height: 22px; margin-top: 8px;
+  }
+  .vu span {
+    width: 6px;
+    background: var(--amber);
+    border-radius: 1px 1px 0 0;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
+  }
+  .vu span.dim { background: rgba(0,0,0,0.15); }
+
+  .actions {
+    display: flex; flex-direction: column; gap: 6px;
+    min-width: 160px;
+    align-items: stretch;
+  }
+  .actions input {
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+    padding: 6px 8px;
+    border: 1px solid var(--tape);
+    border-radius: 4px;
+    background: var(--cream);
+    color: var(--tape-black);
+    width: 100%;
+    outline: none;
+  }
+
+  /* Toast — boombox display */
+  .toast-wrap {
+    position: fixed; bottom: 20px; right: 20px; z-index: 50;
+    display: flex; flex-direction: column; gap: 8px;
+    max-width: 360px;
+  }
+  .toast {
+    background: var(--tape-black);
+    color: var(--amber);
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--amber);
+    border-radius: 6px;
+    box-shadow: 0 4px 14px var(--shadow);
+    letter-spacing: 1px;
+  }
+  .toast.err { color: var(--red); border-color: var(--red); }
+
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(244,233,213,0.6);
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+  }
+  .empty svg { width: 140px; height: 84px; opacity: 0.6; display: block; margin: 0 auto 10px; }
+
+  .grid-featured { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
+
+  @media (max-width: 720px) {
+    .hero h1 { font-size: 36px; }
+    .cassette { grid-template-columns: 1fr; }
+    .cassette-svg { width: 100%; height: auto; }
+    .actions { min-width: 0; }
+    .week-panel { flex-direction: column; gap: 10px; text-align: center; }
+    .grid-featured { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Cassette SVG symbol -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="cassette" viewBox="0 0 200 120">
+      <rect x="4" y="4" width="192" height="112" rx="8" ry="8" fill="#1a1109" stroke="#3d2814" stroke-width="2"/>
+      <rect x="14" y="16" width="172" height="52" rx="4" fill="#e8dcc4"/>
+      <rect x="18" y="20" width="164" height="44" fill="none" stroke="#5b3a1c" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="60" y1="46" x2="140" y2="46" stroke="#5b3a1c" stroke-width="1"/>
+      <!-- reels window -->
+      <rect x="24" y="72" width="152" height="34" rx="3" fill="#0d0806" stroke="#3d2814"/>
+      <!-- tape strip -->
+      <line x1="52" y1="89" x2="148" y2="89" stroke="#3a2410" stroke-width="4"/>
+      <!-- left reel -->
+      <g class="reel" style="transform-origin: 52px 89px;">
+        <circle cx="52" cy="89" r="12" fill="#e8dcc4" stroke="#5b3a1c" stroke-width="1.5"/>
+        <circle cx="52" cy="89" r="3" fill="#1a1109"/>
+        <line x1="52" y1="79" x2="52" y2="99" stroke="#5b3a1c" stroke-width="1"/>
+        <line x1="42" y1="89" x2="62" y2="89" stroke="#5b3a1c" stroke-width="1"/>
+        <line x1="45" y1="82" x2="59" y2="96" stroke="#5b3a1c" stroke-width="1"/>
+        <line x1="59" y1="82" x2="45" y2="96" stroke="#5b3a1c" stroke-width="1"/>
+      </g>
+      <!-- right reel -->
+      <g class="reel" style="transform-origin: 148px 89px;">
+        <circle cx="148" cy="89" r="12" fill="#e8dcc4" stroke="#5b3a1c" stroke-width="1.5"/>
+        <circle cx="148" cy="89" r="3" fill="#1a1109"/>
+        <line x1="148" y1="79" x2="148" y2="99" stroke="#5b3a1c" stroke-width="1"/>
+        <line x1="138" y1="89" x2="158" y2="89" stroke="#5b3a1c" stroke-width="1"/>
+        <line x1="141" y1="82" x2="155" y2="96" stroke="#5b3a1c" stroke-width="1"/>
+        <line x1="155" y1="82" x2="141" y2="96" stroke="#5b3a1c" stroke-width="1"/>
+      </g>
+      <!-- tiny corner screws -->
+      <circle cx="12" cy="12" r="2" fill="#3d2814"/>
+      <circle cx="188" cy="12" r="2" fill="#3d2814"/>
+      <circle cx="12" cy="108" r="2" fill="#3d2814"/>
+      <circle cx="188" cy="108" r="2" fill="#3d2814"/>
+    </symbol>
+    <symbol id="cassette-lonely" viewBox="0 0 200 120">
+      <use href="#cassette"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 200 120"><use href="#cassette"/></svg>
+    TrackJack
+  </div>
+  <div class="spacer"></div>
+  <div class="net-badge" id="netBadge">BOT TESTNET</div>
+  <button class="btn btn-small" id="connectBtn">CONNECT</button>
+</header>
+
+<div class="wrap">
+
+  <section class="hero">
+    <h1>Curate the tape. Weekly.</h1>
+    <p>Stake BOT to upvote a track. Withdraw any time — it's pure signal.</p>
+  </section>
+
+  <div class="week-panel">
+    <div class="week-label" id="weekLabel">WEEK ---</div>
+    <div class="countdown" id="countdown">--D --H --M --S</div>
+  </div>
+
+  <div class="submit-card">
+    <h3>Submit a track</h3>
+    <div class="field">
+      <label>Title</label>
+      <input id="fTitle" maxlength="100" placeholder="Song title..." />
+    </div>
+    <div class="field">
+      <label>Artist</label>
+      <input id="fArtist" maxlength="100" placeholder="Artist..." />
+    </div>
+    <div class="field">
+      <label>URL (optional)</label>
+      <input id="fUrl" maxlength="256" placeholder="https://..." />
+    </div>
+    <button class="btn btn-rec" id="submitBtn">REC</button>
+    <span style="font-family:'VT323',monospace; font-size:15px; margin-left:10px; color:var(--tape);">
+      fee <span id="feeLabel">0.0005</span> BOT
+    </span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="this">THIS WEEK</div>
+    <div class="tab" data-tab="last">LAST WEEK</div>
+    <div class="tab" data-tab="mine">MY SUBMISSIONS</div>
+    <div class="tab" data-tab="votes">MY VOTES</div>
+  </div>
+
+  <div id="featuredWrap">
+    <div class="section-title">Featured Leaderboard</div>
+    <div class="grid-featured" id="featured"></div>
+  </div>
+
+  <div class="section-title" id="listTitle">All Submissions</div>
+  <div id="list"></div>
+
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+  // ========= CONFIG =========
+  const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // <-- paste deployed address here
+
+  const CHAINS = {
+    testnet: {
+      chainIdHex: "0x3C8",
+      chainIdDec: 968,
+      name: "BOT Chain Testnet",
+      rpc: "https://rpc.bohr.life",
+      symbol: "BOT",
+    },
+    // To use mainnet, swap `active` below to `mainnet`:
+    mainnet: {
+      chainIdHex: "0x2A5",
+      chainIdDec: 677,
+      name: "BOT Chain Mainnet",
+      rpc: "https://rpc.botchain.ai",
+      symbol: "BOT",
+    },
+  };
+  const active = CHAINS.testnet;
+
+  const ABI = [
+    "function submitTrack(string title, string artist, string url) payable returns (uint256)",
+    "function upvote(uint256 trackId) payable",
+    "function withdrawUpvote(uint256 trackId)",
+    "function getTrack(uint256 trackId) view returns (address submitter, string title, string artist, string url, uint256 totalStake, uint256 uniqueVoters, uint256 submittedAt, uint16 weekIdx)",
+    "function getUserVote(uint256 trackId, address voter) view returns (uint256)",
+    "function getTracksByWeek(uint16 weekIdx) view returns (uint256[])",
+    "function getTracksBySubmitter(address) view returns (uint256[])",
+    "function getCurrentWeek() view returns (uint16)",
+    "function getTopTracksOfWeek(uint16 weekIdx, uint8 topN) view returns (uint256[])",
+    "function trackCount() view returns (uint256)",
+    "function submitFee() view returns (uint256)",
+    "function minUpvoteStake() view returns (uint256)",
+    "event TrackSubmitted(uint256 indexed trackId, address indexed submitter, uint16 indexed weekIdx, string title, string artist)",
+    "event Upvoted(uint256 indexed trackId, address indexed voter, uint256 amount, uint256 newStake)",
+    "event Withdrawn(uint256 indexed trackId, address indexed voter, uint256 amount)",
+  ];
+
+  // ========= STATE =========
+  let provider, signer, account, contract, readContract;
+  let submitFee = 5n * 10n**14n;  // 0.0005
+  let minUpvote = 1n * 10n**15n;  // 0.001
+  let currentTab = "this";
+  let currentWeek = 0;
+
+  // ========= UTIL =========
+  const $ = (id) => document.getElementById(id);
+  const fmt = (bi) => Number(ethers.formatEther(bi)).toFixed(4).replace(/\.?0+$/, "");
+  const shorten = (a) => a ? a.slice(0,6) + "…" + a.slice(-4) : "";
+
+  function toast(msg, err=false) {
+    const el = document.createElement("div");
+    el.className = "toast" + (err ? " err" : "");
+    el.textContent = "> " + msg;
+    $("toasts").appendChild(el);
+    setTimeout(() => el.remove(), 4200);
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // VU meter: totalStake -> bars (log-ish scale)
+  function vuBars(stakeBI) {
+    const stakeEth = Number(ethers.formatEther(stakeBI));
+    const level = Math.min(16, Math.floor(Math.log2(1 + stakeEth * 200)));
+    let html = '<div class="vu">';
+    for (let i = 0; i < 16; i++) {
+      const h = 6 + i * 1;
+      html += `<span class="${i < level ? '' : 'dim'}" style="height:${h}px"></span>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // ========= NETWORK =========
+  async function ensureNetwork() {
+    if (!window.ethereum) return false;
+    try {
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
+      if (chainId.toLowerCase() !== active.chainIdHex.toLowerCase()) {
+        try {
+          await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: active.chainIdHex }] });
+        } catch (e) {
+          if (e.code === 4902) {
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [{
+                chainId: active.chainIdHex,
+                chainName: active.name,
+                rpcUrls: [active.rpc],
+                nativeCurrency: { name: "BOT", symbol: active.symbol, decimals: 18 },
+              }],
+            });
+          } else { throw e; }
+        }
+      }
+      return true;
+    } catch (e) {
+      toast("network switch failed: " + (e.shortMessage || e.message), true);
+      return false;
+    }
+  }
+
+  async function connect() {
+    if (!window.ethereum) { toast("no wallet found", true); return; }
+    try {
+      const ok = await ensureNetwork();
+      if (!ok) return;
+      const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+      account = accs[0];
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      $("connectBtn").textContent = shorten(account);
+      toast("connected " + shorten(account));
+      await loadConfig();
+      await refresh();
+    } catch (e) {
+      toast(e.shortMessage || e.message, true);
+    }
+  }
+
+  function makeReadProvider() {
+    try {
+      return new ethers.JsonRpcProvider(active.rpc, { chainId: active.chainIdDec, name: active.name });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function loadConfig() {
+    const c = contract || readContract;
+    if (!c) return;
+    try {
+      submitFee = await c.submitFee();
+      minUpvote = await c.minUpvoteStake();
+      $("feeLabel").textContent = fmt(submitFee);
+    } catch {}
+  }
+
+  // ========= UI RENDER =========
+  function cassetteSVG(featured=false) {
+    return `<svg class="cassette-svg" viewBox="0 0 200 120"><use href="#cassette"/></svg>`;
+  }
+
+  function actionsHTML(t) {
+    if (!account) return `<div style="font-family:'VT323',monospace; font-size:14px; color:var(--tape); text-align:center;">connect to vote</div>`;
+    const minEth = fmt(minUpvote);
+    const myStake = t.myStake || 0n;
+    let html = `
+      <input id="amt-${t.id}" placeholder="${minEth}" value="${minEth}" />
+      <button class="btn btn-small btn-play" onclick="doUpvote(${t.id})">UPVOTE</button>
+    `;
+    if (myStake > 0n) {
+      html += `<div style="font-family:'VT323',monospace;font-size:13px;color:var(--tape);text-align:center;">yours: ${fmt(myStake)} BOT</div>`;
+      html += `<button class="btn btn-small" onclick="doWithdraw(${t.id})">WITHDRAW</button>`;
+    }
+    if (t.url && t.url.length > 0) {
+      html += `<a class="btn btn-small" style="text-align:center;text-decoration:none;" href="${esc(t.url)}" target="_blank" rel="noopener">▶ PLAY</a>`;
+    }
+    return html;
+  }
+
+  function cassetteCard(t, opts={}) {
+    const featured = !!opts.featured;
+    const pos = opts.position || 0;
+    return `
+      <div class="cassette ${featured ? 'featured' : ''}">
+        ${pos ? `<div class="position-badge">#${pos}</div>` : ''}
+        ${cassetteSVG(featured)}
+        <div class="track-info">
+          <div class="track-title">${esc(t.title)}</div>
+          <div class="track-artist">— ${esc(t.artist)}</div>
+          <div class="track-meta">STAKE ${fmt(t.totalStake)} BOT · ${t.uniqueVoters} VOTER${Number(t.uniqueVoters)===1?'':'S'} · #${t.id}</div>
+          ${vuBars(t.totalStake)}
+        </div>
+        <div class="actions">${actionsHTML(t)}</div>
+      </div>
+    `;
+  }
+
+  function emptyState(msg) {
+    return `<div class="empty">
+      <svg viewBox="0 0 200 120"><use href="#cassette"/></svg>
+      ${msg}
+    </div>`;
+  }
+
+  // ========= DATA =========
+  async function fetchTrack(id, c) {
+    const t = await c.getTrack(id);
+    const obj = {
+      id: Number(id),
+      submitter: t.submitter,
+      title: t.title,
+      artist: t.artist,
+      url: t.url,
+      totalStake: t.totalStake,
+      uniqueVoters: t.uniqueVoters,
+      submittedAt: Number(t.submittedAt),
+      weekIdx: Number(t.weekIdx),
+    };
+    if (account) {
+      try { obj.myStake = await c.getUserVote(id, account); } catch { obj.myStake = 0n; }
+    } else obj.myStake = 0n;
+    return obj;
+  }
+
+  async function refresh() {
+    const c = contract || readContract;
+    if (!c) return;
+    try {
+      currentWeek = Number(await c.getCurrentWeek());
+      $("weekLabel").textContent = "WEEK " + currentWeek;
+      updateCountdown();
+    } catch {}
+
+    // Featured — top 5 of THIS week
+    try {
+      const topIds = await c.getTopTracksOfWeek(currentWeek, 5);
+      if (topIds.length === 0) {
+        $("featured").innerHTML = emptyState("no tracks submitted this week yet");
+      } else {
+        const tracks = [];
+        for (const id of topIds) tracks.push(await fetchTrack(id, c));
+        $("featured").innerHTML = tracks.map((t, i) => cassetteCard(t, { featured: true, position: i+1 })).join("");
+      }
+    } catch (e) {
+      $("featured").innerHTML = emptyState("could not load leaderboard");
+    }
+
+    await renderList();
+  }
+
+  async function renderList() {
+    const c = contract || readContract;
+    if (!c) return;
+    let ids = [];
+    let title = "";
+    try {
+      if (currentTab === "this") {
+        title = "All Submissions — Week " + currentWeek;
+        ids = await c.getTracksByWeek(currentWeek);
+      } else if (currentTab === "last") {
+        title = "Last Week (Week " + (currentWeek - 1) + ")";
+        ids = await c.getTracksByWeek(currentWeek - 1);
+      } else if (currentTab === "mine") {
+        title = "My Submissions";
+        if (!account) { $("listTitle").textContent = title; $("list").innerHTML = emptyState("connect wallet"); return; }
+        ids = await c.getTracksBySubmitter(account);
+      } else if (currentTab === "votes") {
+        title = "My Votes";
+        if (!account) { $("listTitle").textContent = title; $("list").innerHTML = emptyState("connect wallet"); return; }
+        const total = Number(await c.trackCount());
+        const found = [];
+        for (let i = 0; i < total; i++) {
+          const s = await c.getUserVote(i, account);
+          if (s > 0n) found.push(i);
+        }
+        ids = found;
+      }
+    } catch (e) {
+      $("list").innerHTML = emptyState("could not load: " + (e.shortMessage || e.message));
+      return;
+    }
+    $("listTitle").textContent = title;
+    if (ids.length === 0) {
+      const msg = currentTab === "votes" ? "you haven't upvoted anything" :
+                  currentTab === "mine" ? "you haven't submitted anything" :
+                  "no tracks here yet";
+      $("list").innerHTML = emptyState(msg);
+      return;
+    }
+    const tracks = [];
+    for (const id of ids) tracks.push(await fetchTrack(id, c));
+    // sort DESC by totalStake
+    tracks.sort((a,b) => (b.totalStake > a.totalStake ? 1 : b.totalStake < a.totalStake ? -1 : 0));
+    $("list").innerHTML = tracks.map(t => cassetteCard(t)).join("");
+  }
+
+  // ========= ACTIONS =========
+  window.doUpvote = async (id) => {
+    if (!contract) { toast("connect first", true); return; }
+    const v = $("amt-"+id).value;
+    let wei;
+    try { wei = ethers.parseEther(v); } catch { toast("bad amount", true); return; }
+    if (wei < minUpvote) { toast("min " + fmt(minUpvote) + " BOT", true); return; }
+    try {
+      toast("sending upvote…");
+      const tx = await contract.upvote(id, { value: wei });
+      await tx.wait();
+      toast("upvoted #" + id);
+      await refresh();
+    } catch (e) { toast(e.shortMessage || e.message, true); }
+  };
+
+  window.doWithdraw = async (id) => {
+    if (!contract) { toast("connect first", true); return; }
+    try {
+      toast("withdrawing…");
+      const tx = await contract.withdrawUpvote(id);
+      await tx.wait();
+      toast("withdrawn from #" + id);
+      await refresh();
+    } catch (e) { toast(e.shortMessage || e.message, true); }
+  };
+
+  $("submitBtn").addEventListener("click", async () => {
+    if (!contract) { toast("connect first", true); return; }
+    const title = $("fTitle").value.trim();
+    const artist = $("fArtist").value.trim();
+    const url = $("fUrl").value.trim();
+    if (!title || !artist) { toast("title + artist required", true); return; }
+    try {
+      toast("submitting…");
+      const tx = await contract.submitTrack(title, artist, url, { value: submitFee });
+      await tx.wait();
+      toast("track saved to tape");
+      $("fTitle").value = ""; $("fArtist").value = ""; $("fUrl").value = "";
+      await refresh();
+    } catch (e) { toast(e.shortMessage || e.message, true); }
+  });
+
+  document.querySelectorAll(".tab").forEach(el => {
+    el.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      el.classList.add("active");
+      currentTab = el.dataset.tab;
+      renderList();
+    });
+  });
+
+  $("connectBtn").addEventListener("click", connect);
+
+  // ========= COUNTDOWN =========
+  function updateCountdown() {
+    const now = Math.floor(Date.now() / 1000);
+    const endOfWeek = (currentWeek + 1) * 604800;
+    let s = endOfWeek - now;
+    if (s < 0) s = 0;
+    const d = Math.floor(s / 86400); s %= 86400;
+    const h = Math.floor(s / 3600); s %= 3600;
+    const m = Math.floor(s / 60); s %= 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    $("countdown").textContent = `${pad(d)}D ${pad(h)}H ${pad(m)}M ${pad(s)}S`;
+  }
+  setInterval(() => { if (currentWeek) updateCountdown(); }, 1000);
+
+  // ========= INIT =========
+  (async function init() {
+    $("netBadge").textContent = active.name.toUpperCase();
+    const rp = makeReadProvider();
+    if (rp) {
+      readContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, rp);
+      try { await loadConfig(); } catch {}
+      try { await refresh(); } catch {}
+    }
+    if (window.ethereum) {
+      window.ethereum.on?.("accountsChanged", (a) => { account = a[0]; location.reload(); });
+      window.ethereum.on?.("chainChanged", () => location.reload());
+    }
+  })();
+</script>
+</body>
+</html>
